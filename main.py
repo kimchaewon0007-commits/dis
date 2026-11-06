@@ -802,12 +802,17 @@ function createCharacter(name, team, courtIndex, slot) {
         group: group,
         racket: racket,
 
-        // 내가 조작하는 캐릭터는 2배 빠르게
         speed: name === selectedPlayer ? 8.0 : 4.0,
 
         isHuman: name === selectedPlayer,
+
         swingTime: 0,
         hitCooldown: 0,
+
+        // 점프 관련 변수
+        isJumping: false,
+        jumpVelocity: 0,
+
         homeX: group.position.x,
         homeZ: group.position.z
     };
@@ -1094,7 +1099,6 @@ gameArea.addEventListener("pointerdown", () => {
 gameArea.addEventListener("keydown", event => {
 
     const key = event.key.toLowerCase();
-
     keys[key] = true;
 
     const blockedKeys = [
@@ -1102,7 +1106,8 @@ gameArea.addEventListener("keydown", event => {
         "ArrowDown",
         "ArrowLeft",
         "ArrowRight",
-        "Space"
+        "Space",
+        "Enter"
     ];
 
     if (blockedKeys.includes(event.code)) {
@@ -1111,8 +1116,14 @@ gameArea.addEventListener("keydown", event => {
 
     if (event.repeat) return;
 
-    if (event.code === "Space") {
+    // ENTER = 셔틀콕 치기
+    if (event.code === "Enter") {
         swingRequested = true;
+    }
+
+    // SPACE = 점프
+    if (event.code === "Space") {
+        jumpRequested = true;
     }
 
     if (event.code === "Digit1") {
@@ -1159,6 +1170,7 @@ function moveHuman(character, dt) {
     let dx = 0;
     let dz = 0;
 
+    // 이동
     if (keys["w"] || keys["arrowup"]) dz -= 1;
     if (keys["s"] || keys["arrowdown"]) dz += 1;
     if (keys["a"] || keys["arrowleft"]) dx -= 1;
@@ -1190,9 +1202,35 @@ function moveHuman(character, dt) {
         6.4
     );
 
+    // SPACE를 누르면 점프
+    if (jumpRequested && !character.isJumping) {
+        character.isJumping = true;
+        character.jumpVelocity = 6.5;
+    }
+
+    // 점프 중력 계산
+    if (character.isJumping) {
+
+        character.jumpVelocity -= 18 * dt;
+
+        character.group.position.y +=
+            character.jumpVelocity * dt;
+
+        // 바닥 착지
+        if (character.group.position.y <= 0) {
+
+            character.group.position.y = 0;
+            character.jumpVelocity = 0;
+            character.isJumping = false;
+        }
+    }
+
+    // ENTER를 누르면 라켓 휘두르기
     if (swingRequested) {
         character.swingTime = 0.25;
     }
+
+    jumpRequested = false;
 }
 
 // =========================================================
