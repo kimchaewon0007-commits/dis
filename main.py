@@ -267,7 +267,6 @@ button:disabled {
 </div>
 
 <script>
-<script>
 window.addEventListener("error", function(event) {
 
     const loading = document.getElementById("loading");
@@ -394,16 +393,43 @@ container.appendChild(renderer.domElement);
 const clock = new THREE.Clock();
 
 function resizeGame() {
+
     const width = container.clientWidth;
     const height = container.clientHeight;
 
     camera.aspect = width / height;
+
     camera.updateProjectionMatrix();
 
-    updateScorePanel();
+    // 실제 3D 화면 크기 설정
+    renderer.setSize(width, height, false);
+
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
 }
 
 window.addEventListener("resize", resizeGame);
+
+resizeGame();
+
+document.getElementById("loading").style.display = "none";function resizeGame() {
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    camera.aspect = width / height;
+
+    camera.updateProjectionMatrix();
+
+    // 실제 3D 화면 크기 설정
+    renderer.setSize(width, height, false);
+
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+}
+
+window.addEventListener("resize", resizeGame);
+
 resizeGame();
 
 document.getElementById("loading").style.display = "none";
@@ -1104,10 +1130,11 @@ function updateScorePanel() {
 
     const panel = document.getElementById("scorePanel");
     panel.innerHTML = "";
-
     courts.forEach((court, index) => {
 
         const data = assignments[index];
+
+        if (!data) return;
 
         const card = document.createElement("div");
         card.className = "scoreCard";
@@ -1186,6 +1213,13 @@ function setCamera(mode) {
         );
 
         camera.fov = 50;
+    }
+
+    if (mode !== "all") {
+
+        cameraYaw = 0;
+        cameraPitch = 0.65;
+        cameraDistance = 14;
     }
 
     camera.updateProjectionMatrix();
@@ -1798,6 +1832,7 @@ function hitShuttle(character, shotType) {
 
     shuttle.hitterTeam = character.team;
     court.lastHitter = character.name;
+}
 
 // =========================================================
 // 22. AI 타격
