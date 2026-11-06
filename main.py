@@ -254,8 +254,12 @@ button:disabled {
 </div>
 
 <div id="help">
-    WASD / 방향키 : 이동 |
-    SPACE : 타격 |
+    🎮 WASD : 이동 |
+    🦘 SPACE : 점프 |
+    🏸 왼쪽 마우스 드래그 : 라켓 휘두르기 |
+    📷 오른쪽 마우스 드래그 : 카메라 회전 |
+    🔍 마우스 휠 : 확대·축소 |
+    ENTER : 보조 타격 |
     1 : 클리어 |
     2 : 드롭 |
     3 : 스매시 |
@@ -364,9 +368,16 @@ function resizeGame() {
     const height = container.clientHeight;
 
     camera.aspect = width / height;
+    if (mode !== "all") {
+
+        cameraYaw = 0;
+        cameraPitch = 0.65;
+        cameraDistance = 14;
+    }
+
     camera.updateProjectionMatrix();
 
-    renderer.setSize(width, height);
+    updateScorePanel();
 }
 
 window.addEventListener("resize", resizeGame);
@@ -723,19 +734,60 @@ function createCharacter(name, team, courtIndex, slot) {
         group
     );
 
-    // 팔
-    createBox(
-        0.16, 0.55, 0.16,
-        skinMaterial,
-        -0.32, 1.08, 0,
-        group
-    );
+    // 왼팔: 어깨를 중심으로 회전
+    const leftShoulder = new THREE.Group();
+    leftShoulder.position.set(-0.30, 1.32, 0);
+    group.add(leftShoulder);
 
     createBox(
-        0.16, 0.55, 0.16,
+        0.15, 0.42, 0.15,
         skinMaterial,
-        0.32, 1.08, 0,
-        group
+        0, -0.21, 0,
+        leftShoulder
+    );
+
+    // 오른팔: 어깨 관절
+    const rightShoulder = new THREE.Group();
+    rightShoulder.position.set(0.30, 1.32, 0);
+    group.add(rightShoulder);
+
+    createBox(
+        0.15, 0.38, 0.15,
+        skinMaterial,
+        0, -0.19, 0,
+        rightShoulder
+    );
+
+    // 오른쪽 팔꿈치 관절
+    const rightElbow = new THREE.Group();
+    rightElbow.position.set(0, -0.38, 0);
+    rightShoulder.add(rightElbow);
+
+    createSphere(
+        0.09,
+        skinMaterial,
+        0, 0, 0,
+        rightElbow
+    );
+
+    // 아래팔
+    createBox(
+        0.13, 0.36, 0.13,
+        skinMaterial,
+        0, -0.18, 0,
+        rightElbow
+    );
+
+    // 손목 관절
+    const rightWrist = new THREE.Group();
+    rightWrist.position.set(0, -0.36, 0);
+    rightElbow.add(rightWrist);
+
+    createSphere(
+        0.10,
+        skinMaterial,
+        0, 0, 0,
+        rightWrist
     );
 
     // 다리
@@ -788,8 +840,8 @@ function createCharacter(name, team, courtIndex, slot) {
     racketHead.position.y = 0.85;
     racket.add(racketHead);
 
-    racket.position.set(0.43, 1.05, 0);
-    group.add(racket);
+    racket.position.set(0, -0.08, 0);
+    rightWrist.add(racket);
 
     // 이름표
     const label = createNameLabel(name);
@@ -819,15 +871,27 @@ function createCharacter(name, team, courtIndex, slot) {
         group: group,
         racket: racket,
 
-        // 사용자 캐릭터는 2배 빠르게 이동
-        speed: name === selectedPlayer ? 8.0 : 4.0,
+        leftShoulder: leftShoulder,
+        rightShoulder: rightShoulder,
+        rightElbow: rightElbow,
+        rightWrist: rightWrist,
 
+        armAngle: 0,
+        armVelocity: 0,
+        targetArmAngle: 0,
+
+        elbowAngle: 0,
+        elbowVelocity: 0,
+
+        wristAngle: 0,
+        wristVelocity: 0,
+
+        speed: name === selectedPlayer ? 8.0 : 4.0,
         isHuman: name === selectedPlayer,
 
         swingTime: 0,
         hitCooldown: 0,
 
-        // 점프 관련 변수
         isJumping: false,
         jumpVelocity: 0,
 
@@ -1181,6 +1245,179 @@ gameArea.addEventListener("blur", () => {
 });
 
 // =========================================================
+// 마우스 라켓 조작 + 카메라 조작
+// =========================================================
+
+let racketDragging = false;
+let cameraDragging = false;
+
+let lastMouseX = 0;
+let lastMouseY = 0;
+
+let racketPower = 0;
+let racketDirection = 0;
+
+let cameraYaw = 0;
+let cameraPitch = 0.65;
+let cameraDistance = 14;
+
+let cameraTargetX = courts[0].centerX;
+
+const clamp = THREE.MathUtils.clamp;
+
+// 마우스 오른쪽 버튼 메뉴 방지
+gameArea.addEventListener("contextmenu", event => {
+    event.preventDefault();
+});
+
+// 마우스 버튼 누르기
+gameArea.addEventListener("pointerdown", event => {
+
+    gameArea.focus();
+
+    lastMouseX = event.clientX;
+    lastMouseY = event.clientY;
+
+    if (event.button === 0) {
+        racketDragging = true;
+        racketPower = 0;
+    }
+
+    if (event.button === 2) {
+        cameraDragging = true;
+    }
+
+    if (event.target.setPointerCapture) {
+        event.target.setPointerCapture(event.pointerId);
+    }
+});
+
+// 마우스 움직이기
+gameArea.addEventListener("pointermove", event => {
+
+    const dx = event.clientX - lastMouseX;
+    const dy = event.clientY - lastMouseY;
+
+    lastMouseX = event.clientX;
+    lastMouseY = event.clientY;
+
+    // 왼쪽 드래그: 라켓 움직이기
+    if (racketDragging) {
+
+        const player = characters.find(p => p.isHuman);
+
+        if (player) {
+
+            player.targetArmAngle = clamp(
+                player.targetArmAngle + dx * 0.015,
+                -2.2,
+                2.2
+            );
+
+            racketDirection = dx;
+
+            racketPower += Math.hypot(dx, dy) * 0.025;
+
+            racketPower = clamp(
+                racketPower,
+                0,
+                10
+            );
+        }
+    }
+
+    // 오른쪽 드래그: 카메라 회전
+    if (cameraDragging) {
+
+        cameraYaw -= dx * 0.006;
+
+        cameraPitch = clamp(
+            cameraPitch + dy * 0.005,
+            0.2,
+            1.35
+        );
+    }
+});
+
+// 마우스 버튼 놓기
+gameArea.addEventListener("pointerup", event => {
+
+    if (event.button === 0) {
+
+        if (racketDragging) {
+
+            const player = characters.find(p => p.isHuman);
+
+            if (player && running && !paused) {
+
+                // 너무 약하게 휘두르면 헛스윙
+                if (racketPower >= 1.8) {
+
+                    swingRequested = true;
+
+                    player.swingTime = 0.25;
+
+                } else {
+
+                    setMessage("🏸 스윙이 너무 약했어요!");
+                }
+            }
+        }
+
+        racketDragging = false;
+        racketPower = 0;
+    }
+
+    if (event.button === 2) {
+        cameraDragging = false;
+    }
+});
+
+gameArea.addEventListener("pointercancel", () => {
+    racketDragging = false;
+    cameraDragging = false;
+    racketPower = 0;
+});
+
+// 마우스 휠: 확대 / 축소
+gameArea.addEventListener("wheel", event => {
+
+    event.preventDefault();
+
+    cameraDistance = clamp(
+        cameraDistance + event.deltaY * 0.015,
+        6,
+        32
+    );
+
+}, { passive: false });
+
+// 카메라 위치 업데이트
+function updateOrbitCamera() {
+
+    if (cameraMode === "all") return;
+
+    const court = courts[cameraMode];
+
+    const target = new THREE.Vector3(
+        court.centerX,
+        0.8,
+        0
+    );
+
+    const horizontal =
+        cameraDistance * Math.cos(cameraPitch);
+
+    camera.position.set(
+        target.x + horizontal * Math.sin(cameraYaw),
+        target.y + cameraDistance * Math.sin(cameraPitch),
+        target.z + horizontal * Math.cos(cameraYaw)
+    );
+
+    camera.lookAt(target);
+}
+
+// =========================================================
 // 18. 플레이어 이동
 // =========================================================
 
@@ -1352,18 +1589,105 @@ function animateCharacter(character, dt) {
         character.hitCooldown -= dt;
     }
 
+    // 프레임 변화에 따른 물리 계산 안정화
+    const step = Math.min(dt, 0.033);
+
+    // 어깨 관절: 탄성 + 감쇠
+    const shoulderSpring = 34;
+    const shoulderDamping = 7;
+
+    const shoulderForce =
+        (character.targetArmAngle - character.armAngle)
+        * shoulderSpring;
+
+    character.armVelocity +=
+        shoulderForce * step;
+
+    character.armVelocity *=
+        Math.exp(-shoulderDamping * step);
+
+    character.armAngle +=
+        character.armVelocity * step;
+
+    // 팔꿈치가 어깨 움직임을 늦게 따라감
+    const elbowTarget =
+        -0.45 + character.armAngle * 0.65;
+
+    const elbowForce =
+        (elbowTarget - character.elbowAngle) * 24;
+
+    character.elbowVelocity += elbowForce * step;
+
+    character.elbowVelocity *=
+        Math.exp(-5 * step);
+
+    character.elbowAngle +=
+        character.elbowVelocity * step;
+
+    // 손목은 더 부드럽게 흔들림
+    const wristTarget =
+        character.elbowAngle * -0.55;
+
+    const wristForce =
+        (wristTarget - character.wristAngle) * 18;
+
+    character.wristVelocity += wristForce * step;
+
+    character.wristVelocity *=
+        Math.exp(-4 * step);
+
+    character.wristAngle +=
+        character.wristVelocity * step;
+
+    // 실제 관절에 회전 적용
+    character.rightShoulder.rotation.z =
+        character.armAngle;
+
+    character.rightElbow.rotation.z =
+        character.elbowAngle;
+
+    character.rightWrist.rotation.z =
+        character.wristAngle;
+
+    // 왼팔도 살짝 흔들리게
+    character.leftShoulder.rotation.z =
+        Math.sin(performance.now() * 0.003) * 0.12;
+
+    // 라켓 타격 애니메이션
     if (character.swingTime > 0) {
 
-        character.swingTime -= dt;
+        character.swingTime -= step;
 
-        const progress =
-            1 - character.swingTime / 0.25;
+        const progress = clamp(
+            1 - character.swingTime / 0.25,
+            0,
+            1
+        );
 
-        character.racket.rotation.z =
-            Math.sin(progress * Math.PI) * -1.4;
+        character.rightShoulder.rotation.x =
+            -Math.sin(progress * Math.PI) * 1.4;
+
+        character.rightWrist.rotation.x =
+            -Math.sin(progress * Math.PI) * 0.9;
 
     } else {
-        character.racket.rotation.z = 0;
+
+        character.rightShoulder.rotation.x *= 0.85;
+        character.rightWrist.rotation.x *= 0.85;
+    }
+
+    // 사용자가 드래그하지 않으면 팔이 원위치로 복귀
+    if (character.isHuman && !racketDragging) {
+        character.targetArmAngle *=
+            Math.exp(-2.5 * step);
+    }
+
+    // AI는 자연스럽게 팔 움직이기
+    if (!character.isHuman) {
+
+        character.targetArmAngle =
+            Math.sin(performance.now() * 0.002
+            + character.courtIndex) * 0.15;
     }
 }
 
@@ -1390,39 +1714,69 @@ function hitShuttle(character, shotType) {
         p.z - s.z
     );
 
-    if (horizontalDistance > 1.25) return;
-    if (s.y > 2.6 || s.y < 0.3) return;
+    // 라켓 타격 범위 축소
+    if (horizontalDistance > 0.95) return;
+
+    // 타격 가능한 높이 제한
+    if (s.y > 2.8 || s.y < 0.45) return;
+
+    // 사용자가 마우스로 휘두를 때는
+    // 스윙 방향과 셔틀콕 위치를 비교
+    if (character.isHuman && racketDirection !== 0) {
+
+        const shuttleSide =
+            Math.sign(s.x - p.x);
+
+        const swingSide =
+            Math.sign(racketDirection);
+
+        if (shuttleSide !== swingSide) {
+            setMessage("🏸 스윙 방향이 맞지 않았어요!");
+            return;
+        }
+    }
 
     character.hitCooldown = 0.6;
     character.swingTime = 0.25;
 
+    // 상대 코트 방향
     const direction = character.team === 0 ? -1 : 1;
 
-    let speedZ;
-    let speedY;
+    // 목표 착지 위치
+    let targetZ;
+    let flightTime;
 
     if (shotType === "smash") {
-        speedZ = 13;
-        speedY = 1.5;
+        // 빠르고 강한 스매시
+        targetZ = direction * 4.5;
+        flightTime = 0.65;
+
     } else if (shotType === "drop") {
-        speedZ = 5.5;
-        speedY = 4.2;
+        // 네트 근처로 짧게 떨어지는 드롭
+        targetZ = direction * 2.3;
+        flightTime = 0.9;
+
     } else {
-        speedZ = 8.5;
-        speedY = 8.0;
+        // 상대 코트 뒤쪽으로 보내는 클리어
+        targetZ = direction * 5.3;
+        flightTime = 1.4;
     }
 
-    shuttle.vz = direction * speedZ;
-    shuttle.vy = speedY;
-
+    // 좌우 랜덤 목표
     const targetX =
-        court.centerX + (Math.random() - 0.5) * 3.8;
+        court.centerX + (Math.random() - 0.5) * 4.0;
 
-    shuttle.vx = (targetX - s.x) * 1.5;
+    // 목표 위치까지 날아가는 속도
+    shuttle.vx = (targetX - s.x) / flightTime;
+    shuttle.vz = (targetZ - s.z) / flightTime;
+
+    // 중력을 고려한 초기 수직 속도
+    shuttle.vy =
+        (0.1 - s.y + 4.9 * flightTime * flightTime)
+        / flightTime;
 
     shuttle.hitterTeam = character.team;
     court.lastHitter = character.name;
-}
 
 // =========================================================
 // 22. AI 타격
@@ -1732,7 +2086,6 @@ function update(dt) {
 // =========================================================
 // 30. 애니메이션 루프
 // =========================================================
-
 function animate() {
 
     requestAnimationFrame(animate);
@@ -1740,6 +2093,9 @@ function animate() {
     const dt = Math.min(clock.getDelta(), 0.05);
 
     update(dt);
+
+    // 마우스 카메라 조작 반영
+    updateOrbitCamera();
 
     renderer.render(scene, camera);
 }
