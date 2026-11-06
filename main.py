@@ -288,6 +288,7 @@ let cameraMode = "all";
 
 let currentShot = "clear";
 let swingRequested = false;
+let jumpRequested = false;
 
 const keys = {};
 
@@ -794,21 +795,22 @@ function createCharacter(name, team, courtIndex, slot) {
     }
 
     scene.add(group);
-
     return {
         name: name,
         team: team,
         courtIndex: courtIndex,
         group: group,
         racket: racket,
-        speed: 4.0,
+
+        // 내가 조작하는 캐릭터는 2배 빠르게
+        speed: name === selectedPlayer ? 8.0 : 4.0,
+
         isHuman: name === selectedPlayer,
         swingTime: 0,
         hitCooldown: 0,
         homeX: group.position.x,
         homeZ: group.position.z
     };
-}
 
 // =========================================================
 // 13. 셔틀콕 생성
