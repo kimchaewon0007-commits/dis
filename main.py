@@ -235,16 +235,113 @@ button:disabled {
         <select id="playerSelect"></select>
     </div>
 
-    <div>
-        <button id="randomButton">🎲 랜덤 팀 배정</button>
-        <button id="startButton">▶ 경기 시작</button>
-        <button id="pauseButton">⏸ 일시정지</button>
-        <button id="resetButton">↻ 초기화</button>
-    </div>
+<div>
+    <button id="racketEditorButton">🎨 내 라켓 만들기</button>
+    <button id="randomButton">🎲 랜덤 팀 배정</button>
+    <button id="startButton">▶ 경기 시작</button>
+    <button id="pauseButton">⏸ 일시정지</button>
+    <button id="resetButton">↻ 초기화</button>
+</div>
 </div>
 
 <div id="gameContainer" tabindex="0">
     <div id="loading">3D 체육관을 불러오는 중...</div>
+</div>
+
+<!-- 라켓 제작 화면 -->
+<div id="racketEditor" style="
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.7);
+    z-index:1000;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+">
+
+    <div style="
+        background:white;
+        padding:25px;
+        border-radius:20px;
+        width:min(95vw,650px);
+        max-height:95vh;
+        overflow:auto;
+        text-align:center;
+    ">
+
+        <h2>🎨 나만의 배드민턴 라켓 만들기</h2>
+
+        <p>
+            마우스로 라켓을 자유롭게 그려 보세요!
+        </p>
+
+        <canvas
+            id="racketCanvas"
+            width="500"
+            height="500"
+            style="
+                width:100%;
+                max-width:500px;
+                aspect-ratio:1;
+                background:#ffffff;
+                border:3px solid #176b45;
+                border-radius:12px;
+                cursor:crosshair;
+                touch-action:none;
+            "
+        ></canvas>
+
+        <div style="margin-top:15px;">
+
+            <label>색상</label>
+            <input
+                type="color"
+                id="racketColor"
+                value="#222222"
+            >
+
+            <label>굵기</label>
+            <input
+                type="range"
+                id="racketSize"
+                min="2"
+                max="30"
+                value="8"
+            >
+
+        </div>
+
+        <div style="margin-top:15px;">
+
+            <button id="racketPen">
+                ✏️ 펜
+            </button>
+
+            <button id="racketEraser">
+                🧽 지우개
+            </button>
+
+            <button id="racketClear">
+                🗑 전체 지우기
+            </button>
+
+        </div>
+
+        <div style="margin-top:15px;">
+
+            <button id="racketApply">
+                ✅ 내 캐릭터에 적용하기
+            </button>
+
+            <button id="racketClose">
+                ❌ 닫기
+            </button>
+
+        </div>
+
+    </div>
+
 </div>
 
 <div id="scorePanel"></div>
@@ -1115,6 +1212,13 @@ function randomTeams() {
 
     updateScorePanel();
 
+    // 직접 제작한 라켓이 있으면 다시 장착
+    if (customRacketTexture) {
+
+        applyCustomRacket();
+
+    }
+
     setMessage(
         "🎲 랜덤 팀 배정 완료! 경기 시작을 눌러주세요."
     );
@@ -1471,6 +1575,304 @@ function updateOrbitCamera() {
 
     camera.lookAt(target);
 }
+
+// =========================================================
+// 사용자 라켓 제작 시스템
+// =========================================================
+
+const racketEditor =
+    document.getElementById("racketEditor");
+
+const racketCanvas =
+    document.getElementById("racketCanvas");
+
+const racketCtx =
+    racketCanvas.getContext("2d");
+
+const racketColor =
+    document.getElementById("racketColor");
+
+const racketSize =
+    document.getElementById("racketSize");
+
+let drawing = false;
+let eraserMode = false;
+
+let customRacketTexture = null;
+
+
+// ---------------------------------------------------------
+// 라켓 제작 창 열기
+// ---------------------------------------------------------
+
+document.getElementById("racketEditorButton")
+.addEventListener("click", () => {
+
+    racketEditor.style.display = "flex";
+
+    running = false;
+    paused = false;
+
+    setMessage("🎨 라켓 제작 중!");
+});
+
+
+// ---------------------------------------------------------
+// 라켓 제작 창 닫기
+// ---------------------------------------------------------
+
+document.getElementById("racketClose")
+.addEventListener("click", () => {
+
+    racketEditor.style.display = "none";
+
+});
+
+
+// ---------------------------------------------------------
+// 마우스 위치 계산
+// ---------------------------------------------------------
+
+function getRacketMouse(event) {
+
+    const rect =
+        racketCanvas.getBoundingClientRect();
+
+    const x =
+        (event.clientX - rect.left)
+        * racketCanvas.width / rect.width;
+
+    const y =
+        (event.clientY - rect.top)
+        * racketCanvas.height / rect.height;
+
+    return {x, y};
+}
+
+
+// ---------------------------------------------------------
+// 그림 시작
+// ---------------------------------------------------------
+
+racketCanvas.addEventListener(
+    "pointerdown",
+    event => {
+
+        event.preventDefault();
+
+        drawing = true;
+
+        racketCanvas.setPointerCapture(event.pointerId);
+
+        const pos = getRacketMouse(event);
+
+        racketCtx.beginPath();
+
+        racketCtx.moveTo(pos.x, pos.y);
+
+        racketCtx.lineTo(pos.x, pos.y);
+
+        racketCtx.strokeStyle =
+            racketColor.value;
+
+        racketCtx.lineWidth =
+            Number(racketSize.value);
+
+        racketCtx.lineCap = "round";
+        racketCtx.lineJoin = "round";
+
+        racketCtx.globalCompositeOperation =
+            eraserMode
+                ? "destination-out"
+                : "source-over";
+
+        racketCtx.stroke();
+    }
+);
+
+
+// ---------------------------------------------------------
+// 마우스로 그리기
+// ---------------------------------------------------------
+
+racketCanvas.addEventListener(
+    "pointermove",
+    event => {
+
+        if (!drawing) return;
+
+        event.preventDefault();
+
+        const pos = getRacketMouse(event);
+
+        racketCtx.lineTo(pos.x, pos.y);
+
+        racketCtx.stroke();
+    }
+);
+
+
+// ---------------------------------------------------------
+// 그림 종료
+// ---------------------------------------------------------
+
+function stopRacketDrawing() {
+
+    drawing = false;
+
+    racketCtx.closePath();
+}
+
+racketCanvas.addEventListener(
+    "pointerup",
+    stopRacketDrawing
+);
+
+racketCanvas.addEventListener(
+    "pointercancel",
+    stopRacketDrawing
+);
+
+
+// ---------------------------------------------------------
+// 펜 선택
+// ---------------------------------------------------------
+
+document.getElementById("racketPen")
+.addEventListener("click", () => {
+
+    eraserMode = false;
+
+});
+
+
+// ---------------------------------------------------------
+// 지우개 선택
+// ---------------------------------------------------------
+
+document.getElementById("racketEraser")
+.addEventListener("click", () => {
+
+    eraserMode = true;
+
+});
+
+
+// ---------------------------------------------------------
+// 전체 지우기
+// ---------------------------------------------------------
+
+document.getElementById("racketClear")
+.addEventListener("click", () => {
+
+    racketCtx.clearRect(
+        0,
+        0,
+        racketCanvas.width,
+        racketCanvas.height
+    );
+
+});
+
+
+// ---------------------------------------------------------
+// 직접 그린 라켓을 캐릭터에 장착
+// ---------------------------------------------------------
+
+function applyCustomRacket() {
+
+    const player =
+        characters.find(p => p.isHuman);
+
+    if (!player) {
+
+        setMessage("캐릭터를 먼저 선택해 주세요!");
+
+        return;
+    }
+
+    // 기존에 적용했던 그림 제거
+    if (player.customRacket) {
+
+        player.racket.remove(player.customRacket);
+
+        player.customRacket.geometry.dispose();
+
+        player.customRacket.material.dispose();
+    }
+
+    // 캔버스 그림을 텍스처로 변환
+    if (customRacketTexture) {
+        customRacketTexture.dispose();
+    }
+
+    customRacketTexture =
+        new THREE.CanvasTexture(racketCanvas);
+
+    customRacketTexture.needsUpdate = true;
+
+    const racketMaterial =
+        new THREE.MeshBasicMaterial({
+
+            map: customRacketTexture,
+
+            transparent: true,
+
+            side: THREE.DoubleSide,
+
+            depthWrite: false
+
+        });
+
+    const racketGeometry =
+        new THREE.PlaneGeometry(
+            0.9,
+            0.9
+        );
+
+    const customRacket =
+        new THREE.Mesh(
+            racketGeometry,
+            racketMaterial
+        );
+
+    customRacket.position.set(
+        0,
+        0.55,
+        0.04
+    );
+
+    player.racket.add(customRacket);
+
+    // 기존 라켓 모형 숨기기
+    player.racket.children.forEach(child => {
+
+        if (child !== customRacket) {
+            child.visible = false;
+        }
+
+    });
+
+    player.customRacket = customRacket;
+
+    racketEditor.style.display = "none";
+
+    setMessage(
+        "🎨 직접 만든 라켓을 장착했어요!"
+    );
+
+}
+
+
+// ---------------------------------------------------------
+// 적용 버튼
+// ---------------------------------------------------------
+
+document.getElementById("racketApply")
+.addEventListener(
+    "click",
+    applyCustomRacket
+);
 
 // =========================================================
 // 18. 플레이어 이동
