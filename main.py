@@ -267,18 +267,48 @@ button:disabled {
 </div>
 
 <script>
+<script>
 window.addEventListener("error", function(event) {
+
     const loading = document.getElementById("loading");
 
-    if (loading) {
-        loading.style.display = "flex";
-        loading.style.color = "red";
-        loading.style.padding = "30px";
-        loading.style.textAlign = "center";
+    if (!loading) return;
 
-        loading.textContent =
-            "게임 오류: " + event.message;
-    }
+    loading.style.display = "flex";
+    loading.style.color = "red";
+    loading.style.padding = "30px";
+    loading.style.textAlign = "center";
+
+    loading.style.whiteSpace = "pre-wrap";
+
+    const errorMessage = event.message || "알 수 없는 오류";
+
+    const fileName = event.filename || "파일 정보 없음";
+
+    const lineNumber = event.lineno || "알 수 없음";
+
+    const columnNumber = event.colno || "알 수 없음";
+
+    loading.textContent =
+        "🚨 게임 실행 오류\n\n" +
+        "오류 내용: " + errorMessage + "\n" +
+        "파일: " + fileName + "\n" +
+        "줄 번호: " + lineNumber + "\n" +
+        "열 번호: " + columnNumber;
+});
+
+window.addEventListener("unhandledrejection", function(event) {
+
+    const loading = document.getElementById("loading");
+
+    if (!loading) return;
+
+    loading.style.display = "flex";
+    loading.style.color = "red";
+
+    loading.textContent =
+        "🚨 비동기 오류: " +
+        String(event.reason);
 });
 </script>
 
@@ -368,13 +398,6 @@ function resizeGame() {
     const height = container.clientHeight;
 
     camera.aspect = width / height;
-    if (mode !== "all") {
-
-        cameraYaw = 0;
-        cameraPitch = 0.65;
-        cameraDistance = 14;
-    }
-
     camera.updateProjectionMatrix();
 
     updateScorePanel();
@@ -1260,8 +1283,6 @@ let racketDirection = 0;
 let cameraYaw = 0;
 let cameraPitch = 0.65;
 let cameraDistance = 14;
-
-let cameraTargetX = courts[0].centerX;
 
 const clamp = THREE.MathUtils.clamp;
 
