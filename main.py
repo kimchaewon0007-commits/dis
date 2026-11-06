@@ -31,11 +31,7 @@ PLAYERS = [
 st.markdown("""
 <style>
     .stApp {
-        background: linear-gradient(
-            135deg,
-            #e8f7ee,
-            #f6fff9
-        );
+        background: #e9f6ef;
     }
 
     header {
@@ -43,32 +39,31 @@ st.markdown("""
     }
 
     .block-container {
-        padding-top: 1rem;
-        max-width: 1500px;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0.5rem 1rem !important;
     }
 
     h1 {
         color: #176b45;
         text-align: center;
         font-weight: 800;
+        font-size: 2rem !important;
     }
 
     .subtitle {
         text-align: center;
         color: #54816a;
         font-size: 17px;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
+    }
+
+    iframe {
+        width: 100% !important;
+        border-radius: 15px;
     }
 </style>
 """, unsafe_allow_html=True)
-
-st.title("🏸 BADMINTON 3D")
-st.markdown(
-    '<div class="subtitle">'
-    '친구들과 함께하는 3D 배드민턴 복식 게임'
-    '</div>',
-    unsafe_allow_html=True
-)
 
 # =========================================================
 # 2. 3D 게임 HTML
@@ -135,12 +130,16 @@ button:disabled {
 
 #gameContainer {
     width: 100%;
-    height: 570px;
+    height: 800px;
     position: relative;
-    background: #dceee3;
+    background: #b9d6ca;
     overflow: hidden;
     border-radius: 16px;
-    border: 3px solid #b4d8c2;
+    border: 3px solid #88bca0;
+}
+
+#gameContainer:focus {
+    outline: 3px solid #176b45;
 }
 
 #gameContainer canvas {
@@ -244,7 +243,7 @@ button:disabled {
     </div>
 </div>
 
-<div id="gameContainer">
+<div id="gameContainer" tabindex="0">
     <div id="loading">3D 체육관을 불러오는 중...</div>
 </div>
 
@@ -442,48 +441,60 @@ function createSphere(radius, mat, x, y, z, parent=scene) {
 
 function createGym() {
 
+    // 체육관 바닥
     createBox(
         34, 0.3, 23,
         floorMaterial,
         0, -0.2, 0
     );
 
+    // 체육관 뒤쪽 벽
     createBox(
-        34, 12, 0.3,
+        34, 8, 0.3,
         wallMaterial,
-        0, 6, -11.5
+        0, 4, -11.5
+    );
+
+    // 양쪽 벽
+    createBox(
+        0.3, 8, 23,
+        wallMaterial,
+        -17, 4, 0
     );
 
     createBox(
-        34, 12, 0.3,
+        0.3, 8, 23,
         wallMaterial,
-        0, 6, 11.5
+        17, 4, 0
     );
 
-    createBox(
-        0.3, 12, 23,
-        wallMaterial,
-        -17, 6, 0
-    );
+    // 앞쪽 벽은 카메라 시야 확보를 위해 제거
 
-    createBox(
-        0.3, 12, 23,
-        wallMaterial,
-        17, 6, 0
-    );
-
+    // 체육관 조명
     for (let i = -2; i <= 2; i++) {
+
         const light = new THREE.PointLight(
             0xffffff,
-            0.35,
-            25
+            0.7,
+            30
         );
 
-        light.position.set(i * 6, 9, 0);
+        light.position.set(i * 6, 7.5, 0);
+
         scene.add(light);
+
+        // 천장 조명 모형
+        createBox(
+            2.5,
+            0.08,
+            0.6,
+            material(0xffffff),
+            i * 6,
+            8,
+            0
+        );
     }
 }
-
 createGym();
 
 // =========================================================
@@ -1029,25 +1040,42 @@ function setCamera(mode) {
 
     if (mode === "all") {
 
-        camera.position.set(0, 28, 28);
-        camera.lookAt(0, 0, 0);
+        // 3개 코트를 한눈에 볼 수 있는 시점
+        camera.position.set(
+            0,
+            22,
+            19
+        );
+
+        camera.lookAt(
+            0,
+            0,
+            0
+        );
+
+        camera.fov = 65;
 
     } else {
 
         const court = courts[mode];
 
+        // 선택한 코트 확대
         camera.position.set(
             court.centerX,
-            13,
-            14
+            9,
+            10
         );
 
         camera.lookAt(
             court.centerX,
-            0,
+            0.8,
             0
         );
+
+        camera.fov = 50;
     }
+
+    camera.updateProjectionMatrix();
 
     updateScorePanel();
 }
@@ -1055,16 +1083,27 @@ function setCamera(mode) {
 // =========================================================
 // 17. 키보드 조작
 // =========================================================
+const gameArea = document.getElementById("gameContainer");
 
-document.addEventListener("keydown", event => {
+gameArea.addEventListener("pointerdown", () => {
+    gameArea.focus();
+});
+
+gameArea.addEventListener("keydown", event => {
 
     const key = event.key.toLowerCase();
+
     keys[key] = true;
 
-    if (
-        ["ArrowUp", "ArrowDown", "ArrowLeft",
-         "ArrowRight", "Space"].includes(event.code)
-    ) {
+    const blockedKeys = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "Space"
+    ];
+
+    if (blockedKeys.includes(event.code)) {
         event.preventDefault();
     }
 
@@ -1090,12 +1129,23 @@ document.addEventListener("keydown", event => {
     }
 
     if (event.code === "KeyV") {
-        setCamera(cameraMode === "all" ? 0 : "all");
+        setCamera(
+            cameraMode === "all" ? 0 : "all"
+        );
     }
 });
 
-document.addEventListener("keyup", event => {
+gameArea.addEventListener("keyup", event => {
     keys[event.key.toLowerCase()] = false;
+});
+
+gameArea.addEventListener("blur", () => {
+
+    Object.keys(keys).forEach(key => {
+        keys[key] = false;
+    });
+
+    swingRequested = false;
 });
 
 // =========================================================
@@ -1644,9 +1694,8 @@ game_html = game_html.replace(
 # =========================================================
 # 33. 게임 화면 출력
 # =========================================================
-
 components.html(
     game_html,
-    height=850,
+    height=1150,
     scrolling=True
 )
