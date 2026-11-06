@@ -1334,75 +1334,89 @@ function setCamera(mode) {
 // =========================================================
 // 17. 키보드 조작
 // =========================================================
+// =========================================================
+// 17. 키보드 조작 - WASD 전용
+// =========================================================
+
 const gameArea = document.getElementById("gameContainer");
 
+// 게임 화면 클릭 시 키보드 활성화
 gameArea.addEventListener("pointerdown", () => {
     gameArea.focus();
 });
 
-gameArea.addEventListener("keydown", event => {
+// 키보드 누르기
+window.addEventListener("keydown", event => {
 
-    const key = event.key.toLowerCase();
-    keys[key] = true;
+    const code = event.code;
 
-    const blockedKeys = [
-        "ArrowUp",
-        "ArrowDown",
-        "ArrowLeft",
-        "ArrowRight",
-        "Space",
-        "Enter"
-    ];
+    // WASD 이동
+    if (code === "KeyW") keys["w"] = true;
+    if (code === "KeyA") keys["a"] = true;
+    if (code === "KeyS") keys["s"] = true;
+    if (code === "KeyD") keys["d"] = true;
 
-    if (blockedKeys.includes(event.code)) {
+    // 게임 조작키의 기본 동작 방지
+    if ([
+        "KeyW", "KeyA", "KeyS", "KeyD",
+        "Space", "Enter"
+    ].includes(code)) {
         event.preventDefault();
     }
 
     if (event.repeat) return;
 
-    // ENTER = 셔틀콕 치기
-    if (event.code === "Enter") {
+    // ENTER = 타격
+    if (code === "Enter") {
         swingRequested = true;
     }
 
     // SPACE = 점프
-    if (event.code === "Space") {
+    if (code === "Space") {
         jumpRequested = true;
     }
 
-    if (event.code === "Digit1") {
+    // 타격 종류
+    if (code === "Digit1") {
         currentShot = "clear";
         setMessage("🏸 클리어 선택");
     }
 
-    if (event.code === "Digit2") {
+    if (code === "Digit2") {
         currentShot = "drop";
         setMessage("🏸 드롭 선택");
     }
 
-    if (event.code === "Digit3") {
+    if (code === "Digit3") {
         currentShot = "smash";
         setMessage("💥 스매시 선택");
     }
 
-    if (event.code === "KeyV") {
-        setCamera(
-            cameraMode === "all" ? 0 : "all"
-        );
+    // 카메라 전환
+    if (code === "KeyV") {
+        setCamera(cameraMode === "all" ? 0 : "all");
     }
 });
 
-gameArea.addEventListener("keyup", event => {
-    keys[event.key.toLowerCase()] = false;
+// 키보드 떼기
+window.addEventListener("keyup", event => {
+
+    if (event.code === "KeyW") keys["w"] = false;
+    if (event.code === "KeyA") keys["a"] = false;
+    if (event.code === "KeyS") keys["s"] = false;
+    if (event.code === "KeyD") keys["d"] = false;
+
 });
 
-gameArea.addEventListener("blur", () => {
+// 다른 창으로 이동하면 이동 중지
+window.addEventListener("blur", () => {
 
     Object.keys(keys).forEach(key => {
         keys[key] = false;
     });
 
     swingRequested = false;
+    jumpRequested = false;
 });
 
 // =========================================================
