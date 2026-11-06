@@ -262,7 +262,23 @@ button:disabled {
     V : 카메라 전환
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+window.addEventListener("error", function(event) {
+    const loading = document.getElementById("loading");
+
+    if (loading) {
+        loading.style.display = "flex";
+        loading.style.color = "red";
+        loading.style.padding = "30px";
+        loading.style.textAlign = "center";
+
+        loading.textContent =
+            "게임 오류: " + event.message;
+    }
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 
 <script>
 
