@@ -811,6 +811,7 @@ function createCharacter(name, team, courtIndex, slot) {
     }
 
     scene.add(group);
+
     return {
         name: name,
         team: team,
@@ -818,6 +819,7 @@ function createCharacter(name, team, courtIndex, slot) {
         group: group,
         racket: racket,
 
+        // 사용자 캐릭터는 2배 빠르게 이동
         speed: name === selectedPlayer ? 8.0 : 4.0,
 
         isHuman: name === selectedPlayer,
@@ -832,6 +834,7 @@ function createCharacter(name, team, courtIndex, slot) {
         homeX: group.position.x,
         homeZ: group.position.z
     };
+}
 
 // =========================================================
 // 13. 셔틀콕 생성
