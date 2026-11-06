@@ -1882,12 +1882,12 @@ function moveHuman(character, dt) {
 
     let dx = 0;
     let dz = 0;
-
-    // WASD 키로만 이동
-    if (keys["w"]) dz -= 1;
-    if (keys["s"]) dz += 1;
-    if (keys["a"]) dx -= 1;
-    if (keys["d"]) dx += 1;
+    
+    // 이동
+    if (keys["w"] || keys["arrowup"]) dz -= 1;
+    if (keys["s"] || keys["arrowdown"]) dz += 1;
+    if (keys["a"] || keys["arrowleft"]) dx -= 1;
+    if (keys["d"] || keys["arrowright"]) dx += 1;
     
     const length = Math.hypot(dx, dz);
 
