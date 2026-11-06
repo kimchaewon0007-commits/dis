@@ -1539,9 +1539,15 @@ function updateShuttle(court, dt) {
 
 function startGame() {
 
+    // 일시정지 상태에서 다시 시작
     if (running && paused) {
+
         paused = false;
+
+        gameArea.focus();
+
         setMessage("▶ 경기를 재개했습니다.");
+
         return;
     }
 
@@ -1550,14 +1556,25 @@ function startGame() {
     running = true;
     paused = false;
 
+    // 3개 코트 경기 초기화 및 시작
     courts.forEach(court => {
+
         court.score = [0, 0];
         court.finished = false;
         court.rally = null;
-        serve(court, Math.random() < 0.5 ? 0 : 1);
+
+        const servingTeam =
+            Math.random() < 0.5 ? 0 : 1;
+
+        serve(court, servingTeam);
     });
 
+    // 내가 조작하는 1번 코트 확대
     setCamera(0);
+
+    // 키보드 입력 활성화
+    gameArea.focus();
+
     updateScorePanel();
 
     setMessage(
